@@ -36,7 +36,7 @@ let tokenize = function(code) {
     if (strip(/ |\t/)) {
       addToken("whitespace");
     }
-    else if (strip(/\n|\r/)) {
+    else if (strip(/\r?\n|\r|\n/)) {
       addToken("line-end");
       line++;
     }
