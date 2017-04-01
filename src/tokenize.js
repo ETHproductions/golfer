@@ -38,6 +38,7 @@ let tokenize = function(code) {
     }
     else if (strip(/\n|\r/)) {
       addToken("line-end");
+      line++;
     }
 
     // Numeric literals: binary, octal, hex, decimal
