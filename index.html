@@ -1,13 +1,18 @@
 <textarea id="code" rows=8 cols=60 placeholder="Enter JavaScript code here..."></textarea><br>
-<button onclick="run()">Run</button>
+<button onclick="run()">Run</button> Version:
+<select id="version">
+<option value="5">ES5</option>
+<option value="6">ES6 / ES2015</option>
+<option value="2016">ES2016</option>
+</select>
 <p>The raw result is logged to the console.</p>
 <pre id="tokens"></pre>
 <script>
 function $(){return document.getElementById.apply(document,arguments);}
 function run() {
-  let tokens, code = $("code").value, output = $("tokens");
+  let tokens, code = $("code").value, version = $("version").value, output = $("tokens");
   try {
-    tokens = tokenize(code);
+    tokens = tokenize(code, version);
   } catch (e) {
     output.textContent = e;
     return;

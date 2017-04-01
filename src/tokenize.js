@@ -1,4 +1,10 @@
-let tokenize = function(code) {
+// For the esversion parameter:
+// ES5    -> 5
+// ES6    -> 6 or 2015
+// ES2016 -> 7 or 2016
+// ES2017 -> 2017
+// etc.
+let tokenize = function(code, esversion = 5) {
   class Token {
     constructor(type, value, start, end, line, col) {
       this.type = type;
@@ -9,8 +15,11 @@ let tokenize = function(code) {
       this.col = col;
     }
   }
+  
+  if (esversion === 7) esversion = 2016;
 
   let orig = code,
+      es6 = 6 <= esversion,
       tokens = [],
       startIndex = 0,
       endIndex = 0,
@@ -19,6 +28,7 @@ let tokenize = function(code) {
       expression = false,
       line = 1,
       col = 1;
+  
   while (code.length && maxloop--) {
     let stripped, strip = (regex) => {
       if (code.search(regex) === 0) {
@@ -43,12 +53,16 @@ let tokenize = function(code) {
       line++;
     }
 
-    // Numeric literals: binary, octal, hex, decimal
-    else if (strip(/0b[01]+/)) {
+    // Numeric literals: binary, octal, legacy octal, hex, decimal
+    else if (es6 && strip(/0b[01]+/)) {
       addToken("literal");
       expression = true;
     }
-    else if (strip(/0o[0-7]+/)) {
+    else if (es6 && strip(/0o[0-7]+/)) {
+      addToken("literal");
+      expression = true;
+    }
+    else if (strip(/0\d+/)) {
       addToken("literal");
       expression = true;
     }
@@ -72,21 +86,21 @@ let tokenize = function(code) {
     }
 
     // Template literals
-    else if (strip(/`(?:\\[^]|(?!\$\{)[^\\`])*`/)) {
+    else if (es6 && strip(/`(?:\\[^]|(?!\$\{)[^\\`])*`/)) {
       addToken("template");
       expression = true;
     }
-    else if (strip(/`(?:\\[^]|(?!\$\{)[^\\`])*\$\{/)) {
+    else if (es6 && strip(/`(?:\\[^]|(?!\$\{)[^\\`])*\$\{/)) {
       addToken("template-start");
       braces.unshift(0);
       expression = false;
     }
-    else if (braces[0] === 0 && braces.length > 1 && strip(/\}(?:\\[^]|(?!\$\{)[^\\`])*`/)) {
+    else if (es6 && braces[0] === 0 && braces.length > 1 && strip(/\}(?:\\[^]|(?!\$\{)[^\\`])*`/)) {
       addToken("template-end");
       expression = true;
       braces.shift();
     }
-    else if (braces[0] === 0 && braces.length > 1 && strip(/\}(?:\\[^]|(?!\$\{)[^\\`])*\$\{/)) {
+    else if (es6 && braces[0] === 0 && braces.length > 1 && strip(/\}(?:\\[^]|(?!\$\{)[^\\`])*\$\{/)) {
       addToken("template-middle");
       expression = false;
     }
@@ -124,9 +138,19 @@ let tokenize = function(code) {
       addToken("literal");
       expression = true;
     }
-
+    
+    // ES6 Operators
+    else if (es6 && strip(/=>|\.\.\./)) {
+      addToken("operator");
+      expression = false;
+    }
+    // ES7 Operators
+    else if (2016 <= esversion && strip(/\*\*=?/)) {
+      addToken("operator");
+      expression = false;
+    }
     // Operators
-    else if (strip(/!|~|\?|:|=>|\.\.\.|\.|&&|\|\||\+\+|--|(?:\*\*|!=|==|<<|>>>?|[+\-*\/%&|^<=>])=?/)) {
+    else if (strip(/!|~|\?|:|\.|&&|\|\||\+\+|--|(?:!=|==|<<|>>>?|[+\-*\/%&|^<=>])=?/)) {
       addToken("operator");
       expression = false;
     }
