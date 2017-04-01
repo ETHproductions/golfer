@@ -1,0 +1,24 @@
+<textarea id="code" rows=8 cols=60 placeholder="Enter JavaScript code here..."></textarea><br>
+<button onclick="run()">Run</button>
+<p>The raw result is logged to the console.</p>
+<pre id="tokens"></pre>
+<script>
+function $(){return document.getElementById.apply(document,arguments);}
+function run() {
+  let tokens, code = $("code").value, output = $("tokens");
+  try {
+    tokens = tokenize(code);
+  } catch (e) {
+    output.textContent = e;
+    return;
+  }
+  
+  output.textContent = tokens.map(t => `{
+  type: ${JSON.stringify(t.type)},
+  value: ${JSON.stringify(t.value)},
+  start: ${t.start},
+  end: ${t.end}
+}`).join(",\n");
+}
+</script>
+<script src="src/tokenize.js"></script>
