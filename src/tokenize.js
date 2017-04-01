@@ -1,10 +1,11 @@
 let tokenize = function(code) {
   class Token {
-    constructor(type, value, start, end) {
+    constructor(type, value, start, end, line) {
       this.type = type;
       this.value = value;
       this.start = start;
       this.end = end;
+      this.line = line;
     }
   }
 
@@ -14,7 +15,8 @@ let tokenize = function(code) {
       endIndex = 0,
       maxloop = 10000,
       braces = [0],
-      expression = false;
+      expression = false,
+      line = 1;
   while (code.length && maxloop--) {
     let stripped, strip = (regex) => {
       if (code.search(regex) === 0) {
@@ -28,7 +30,7 @@ let tokenize = function(code) {
       }
     };
     let addToken = (type) => {
-      tokens.push(new Token(type, stripped, startIndex, endIndex));
+      tokens.push(new Token(type, stripped, startIndex, endIndex, line));
     }
 
     if (strip(/ |\t/)) {
