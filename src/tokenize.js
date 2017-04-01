@@ -67,36 +67,31 @@ let tokenize = function(code) {
     else if (strip(/(["'])(?:(?!\1)(?:\\[^]|[^\\]))*\1/)) {
       addToken("literal");
       expression = true;
-      if(stripped.indexOf("\n") !== -1)
-          line++;
+      line += stripped.split("\n").length - 1;
     }
 
     // Template literals
     else if (strip(/`(?:\\[^]|(?!\$\{)[^\\`])*`/)) {
       addToken("template");
       expression = true;
-      if(stripped.indexOf("\n") !== -1)
-          line++;
+      line += stripped.split("\n").length - 1;
     }
     else if (strip(/`(?:\\[^]|(?!\$\{)[^\\`])*\$\{/)) {
       addToken("template-start");
       braces.unshift(0);
       expression = false;
-      if(stripped.indexOf("\n") !== -1)
-          line++;
+      line += stripped.split("\n").length - 1;
     }
     else if (braces[0] === 0 && braces.length > 1 && strip(/\}(?:\\[^]|(?!\$\{)[^\\`])*`/)) {
       addToken("template-end");
       expression = true;
       braces.shift();
-      if(stripped.indexOf("\n") !== -1)
-          line++;
+      line += stripped.split("\n").length - 1;
     }
     else if (braces[0] === 0 && braces.length > 1 && strip(/\}(?:\\[^]|(?!\$\{)[^\\`])*\$\{/)) {
       addToken("template-middle");
       expression = false;
-      if(stripped.indexOf("\n") !== -1)
-          line++;
+      line += stripped.split("\n").length - 1;
     }
 
     // Values that throw an error when you try to assign something to
