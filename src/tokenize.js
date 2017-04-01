@@ -1,11 +1,12 @@
 let tokenize = function(code) {
   class Token {
-    constructor(type, value, start, end, line) {
+    constructor(type, value, start, end, line, col) {
       this.type = type;
       this.value = value;
       this.start = start;
       this.end = end;
       this.line = line;
+      this.col = col;
     }
   }
 
@@ -16,7 +17,8 @@ let tokenize = function(code) {
       maxloop = 10000,
       braces = [0],
       expression = false,
-      line = 1;
+      line = 1,
+      col = 1;
   while (code.length && maxloop--) {
     let stripped, strip = (regex) => {
       if (code.search(regex) === 0) {
@@ -30,7 +32,7 @@ let tokenize = function(code) {
       }
     };
     let addToken = (type) => {
-      tokens.push(new Token(type, stripped, startIndex, endIndex, line));
+      tokens.push(new Token(type, stripped, startIndex, endIndex, line, col));
     }
 
     if (strip(/ |\t/)) {
@@ -67,31 +69,26 @@ let tokenize = function(code) {
     else if (strip(/(["'])(?:(?!\1)(?:\\[^]|[^\\]))*\1/)) {
       addToken("literal");
       expression = true;
-      line += stripped.split("\n").length - 1;
     }
 
     // Template literals
     else if (strip(/`(?:\\[^]|(?!\$\{)[^\\`])*`/)) {
       addToken("template");
       expression = true;
-      line += stripped.split("\n").length - 1;
     }
     else if (strip(/`(?:\\[^]|(?!\$\{)[^\\`])*\$\{/)) {
       addToken("template-start");
       braces.unshift(0);
       expression = false;
-      line += stripped.split("\n").length - 1;
     }
     else if (braces[0] === 0 && braces.length > 1 && strip(/\}(?:\\[^]|(?!\$\{)[^\\`])*`/)) {
       addToken("template-end");
       expression = true;
       braces.shift();
-      line += stripped.split("\n").length - 1;
     }
     else if (braces[0] === 0 && braces.length > 1 && strip(/\}(?:\\[^]|(?!\$\{)[^\\`])*\$\{/)) {
       addToken("template-middle");
       expression = false;
-      line += stripped.split("\n").length - 1;
     }
 
     // Values that throw an error when you try to assign something to
@@ -176,6 +173,10 @@ let tokenize = function(code) {
     else {
       throw new SyntaxError("Couldn't understand this code: " + code);
     }
+    
+    line += stripped.split("\n").length - 1;
+    if (stripped.indexOf("\n") > -1) col = stripped.length - stripped.lastIndexOf("\n");
+    else col += stripped.length;
   }
 
   console.log(tokens);
