@@ -150,7 +150,7 @@ let tokenize = function(code, esversion = 5) {
       expression = false;
     }
     // Operators
-    else if (strip(/!|~|\?|:|\.|&&|\|\||\+\+|--|(?:!=|==|<<|>>>?|[+\-*\/%&|^<=>])=?/)) {
+    else if (strip(/&&|\|\||\+\+|--|(?:!=|==|<<|>>>?|[+\-*\/%&|^<=>])=?|!|~|\?|:|\./)) {
       addToken("operator");
       expression = false;
     }
