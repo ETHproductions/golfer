@@ -20,7 +20,7 @@
                 background-color: transparent;
             }
             
-            .highlight {
+            hl {
                 padding-left: 1px;
                 margin-left: -1px;
                 padding-right: 1px;
@@ -28,12 +28,14 @@
                 border-radius: 2px;
             }
             
-            .red {
-                background-color: #CC0F05;
-            }
-            .orange {
-                background-color: #CF8807;
-            }
+            hl.red    { background-color: #FF4842; }
+            hl.orange { background-color: #FF9817; }
+            hl.yellow { background-color: #FDF019; }
+            hl.green  { background-color: #23C61A; }
+            hl.blue   { background-color: #4198F3; }
+            hl.purple { background-color: #A849F5; }
+            hl.magenta{ background-color: #FE59EF; }
+            hl.grey   { background-color: #A6A7A9; }
         </style>
     </head>
     <body>
@@ -47,6 +49,8 @@
             <option value="5">ES5</option>
             <option value="6">ES6 / ES2015</option>
             <option value="2016">ES2016</option>
+            <option value="2017" selected>ES2017</option>
+            <option value="2018">ES2018</option>
         </select>
         
         <p>The raw result is logged to the console.</p>
@@ -55,16 +59,17 @@
         <script>
             function $(){return document.getElementById.apply(document,arguments);}
             function run() {
-              let tokens, code = $("code").value, version = $("version").value, output = $("tokens");
+              let tokens, code = $("code").value, version = $("version").value, tokenOutput = $("tokens");
               try {
                 tokens = tokenize(code, version);
               } catch (e) {
-                output.textContent = e;
-                return;
+                tokenOutput.textContent = e;
+                throw e;
               }
               
-              output.textContent = "Tokens:\n" + tokens.map(t => "{\n" +
-                ["type", "value", "start", "end", "line", "col"].map(n => "  " + n + ": " + JSON.stringify(t[n])).join(",\n") + "\n}"
+              tokenOutput.textContent = "Tokens:\n" + tokens.map(t => "{\n" +
+                ["type", "value", "start", "end", "line", "col"].map(n => "  " + n + ": " + JSON.stringify(t[n])).join(",\n")
+                + "\n}"
               ).join(",\n");
             }
         </script>
