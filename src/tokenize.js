@@ -24,11 +24,14 @@ let tokenize = function(code, esversion = 5) {
       stripped = null,
       startIndex = 0,
       endIndex = 0,
+      line = 1,
+      col = 1,
       maxloop = 10000,
       braces = [0],
       expression = false,
-      line = 1,
-      col = 1;
+      lastTrueToken = new Token("line-end", "\n", 0, 0, 0, 0),
+      newLine = true;
+  
   let strip = (regex) => {
     if (code.search(regex) === 0) {
       [stripped] = code.match(regex) || [];
@@ -41,7 +44,18 @@ let tokenize = function(code, esversion = 5) {
     }
   };
   let addToken = (type) => {
-    tokens.push(new Token(type, stripped, startIndex, endIndex, line, col));
+    let token = new Token(type, stripped, startIndex, endIndex, line, col);
+    tokens.push(token);
+    if (type === "whitespace" || type === "comment") {
+      
+    }
+    else if (type === "line-end") {
+      newLine = true;
+    }
+    else {
+      lastTrueToken = token;
+      newLine = false;
+    }
   }
   
   while (code.length && maxloop--) {
@@ -82,6 +96,9 @@ let tokenize = function(code, esversion = 5) {
       addToken("literal");
       expression = true;
     }
+    else if (strip(/["']/)) {
+      throw new SyntaxError("Unfinished string (line " + line + ", col " + col + ")");
+    }
 
     // Template literals
     else if (es6 && strip(/`(?:\\[^]|(?!\$\{)[^\\`])*`/)) {
@@ -93,6 +110,9 @@ let tokenize = function(code, esversion = 5) {
       braces.unshift(0);
       expression = false;
     }
+    else if (es6 && strip(/`/)) {
+      throw new SyntaxError("Unfinished template literal (line " + line + ", col " + col + ")");
+    }
     else if (es6 && braces[0] === 0 && braces.length > 1 && strip(/\}(?:\\[^]|(?!\$\{)[^\\`])*`/)) {
       addToken("template-end");
       expression = true;
@@ -102,21 +122,29 @@ let tokenize = function(code, esversion = 5) {
       addToken("template-middle");
       expression = false;
     }
+    else if (es6 && braces[0] === 0 && braces.length > 1 && strip(/\}/)) {
+      throw new SyntaxError("Unfinished template literal section (line " + line + ", col " + col + ")");
+    }
 
     // Values that throw an error when you try to assign something to
     // undefined, Infinity, and NaN cannot be assigned to, but they don't throw an error either
     else if (strip(/(?:false|true|null|this)(?![\w$])/)) {
       addToken("literal");
-      expression = false;
+      expression = true;
     }
 
-    // Taken from http://www.javascripter.net/faq/reserved.htm, but
-    // only the ones that cannot be used as variable names in Firefox 54.0a2
-    else if (strip(/(?:break|case|catch|class|const|continue|debugger|default|delete|do|else|enum|export|extends|finally|for|function|if|import|in|instanceof|new|return|super|switch|throw|try|typeof|var|void|while|with)(?![\w$])/)) {
+    // Taken from http://www.ecma-international.org/ecma-262/5.1/#sec-7.6.1
+    else if (lastTrueToken.type !== "period" && strip(/(?:break|case|catch|class|const|continue|debugger|default|delete|do|else|enum|export|extends|finally|for|function|if|import|in|instanceof|new|return|super|switch|throw|try|typeof|var|void|while|with)(?![\w$])/)) {
       addToken("keyword");
       expression = false;
     }
-    else if (es6 && strip(/(?:await|let|yield)(?![\w$])/)) {
+    // Taken from http://www.ecma-international.org/ecma-262/6.0/#sec-11.6.2
+    // Note: let and static *can* be used as identifiers outside of strict mode
+    else if (es6 && lastTrueToken.type !== "period" && strip(/(?:await|let|static|yield)(?![\w$])/)) {
+      addToken("keyword");
+      expression = false;
+    }
+    else if (esversion >= 2017 && lastTrueToken.type !== "period" && strip(/(?:async)(?![\w$])/)) {
       addToken("keyword");
       expression = false;
     }
@@ -155,12 +183,16 @@ let tokenize = function(code, esversion = 5) {
       expression = false;
     }
     // Operators
-    else if (strip(/&&|\|\||\+\+|--|(?:!=|==|<<|>>>?|[+\-*\/%&|^<=>])=?|!|~|\?|:|\./)) {
+    else if (strip(/&&|\|\||\+\+|--|(?:!=|==|<<|>>>?|[+\-*\/%&|^<=>])=?|[!?:~]/)) {
       addToken("operator");
       expression = false;
     }
 
     // Various other structural components
+    else if (strip(/\./)) {
+      addToken("period");
+      expression = false;
+    }
     else if (strip(/,/)) {
       addToken("comma");
       expression = false;
