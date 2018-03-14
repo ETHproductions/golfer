@@ -1,31 +1,32 @@
-<textarea id="code" rows=8 cols=60 placeholder="Enter JavaScript code here..."></textarea><br>
-<button onclick="run()">Run</button> Version:
-<select id="version">
-<option value="5">ES5</option>
-<option value="6">ES6 / ES2015</option>
-<option value="2016">ES2016</option>
-</select>
-<p>The raw result is logged to the console.</p>
-<pre id="tokens"></pre>
-<script>
-function $(){return document.getElementById.apply(document,arguments);}
-function run() {
-  let tokens, code = $("code").value, version = $("version").value, output = $("tokens");
-  try {
-    tokens = tokenize(code, version);
-  } catch (e) {
-    output.textContent = e;
-    return;
-  }
-  
-  output.textContent = tokens.map(t => `{
-  type: ${JSON.stringify(t.type)},
-  value: ${JSON.stringify(t.value)},
-  start: ${t.start},
-  end: ${t.end},
-  line: ${t.line},
-  col: ${t.col}
-}`).join(",\n");
-}
-</script>
-<script src="src/tokenize.js"></script>
+<!doctype html>
+<html>
+    <head></head>
+    <body>
+        <textarea id="code" rows=8 cols=60 placeholder="Enter JavaScript code here..."></textarea><br>
+        <button onclick="run()">Run</button> Version:
+        <select id="version">
+        <option value="5">ES5</option>
+        <option value="6">ES6 / ES2015</option>
+        <option value="2016">ES2016</option>
+        </select>
+        <p>The raw result is logged to the console.</p>
+        <pre id="tokens"></pre>
+        <script>
+            function $(){return document.getElementById.apply(document,arguments);}
+            function run() {
+              let tokens, code = $("code").value, version = $("version").value, output = $("tokens");
+              try {
+                tokens = tokenize(code, version);
+              } catch (e) {
+                output.textContent = e;
+                return;
+              }
+              
+              output.textContent = "Tokens:\n" + tokens.map(t => "{\n" +
+                ["type", "value", "start", "end", "line", "col"].map(n => "  " + n + ": " + JSON.stringify(t[n])).join(",\n") + "\n}"
+              ).join(",\n");
+            }
+        </script>
+        <script src="src/tokenize.js"></script>
+    </body>
+</html>

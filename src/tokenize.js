@@ -21,6 +21,7 @@ let tokenize = function(code, esversion = 5) {
   let orig = code,
       es6 = 6 <= esversion,
       tokens = [],
+      stripped = null,
       startIndex = 0,
       endIndex = 0,
       maxloop = 10000,
@@ -28,23 +29,24 @@ let tokenize = function(code, esversion = 5) {
       expression = false,
       line = 1,
       col = 1;
+  let strip = (regex) => {
+    if (code.search(regex) === 0) {
+      [stripped] = code.match(regex) || [];
+      code = code.slice(stripped.length);
+      startIndex = endIndex;
+      endIndex += stripped.length;
+      return stripped;
+    } else {
+      return false;
+    }
+  };
+  let addToken = (type) => {
+    tokens.push(new Token(type, stripped, startIndex, endIndex, line, col));
+  }
   
   while (code.length && maxloop--) {
-    let stripped, strip = (regex) => {
-      if (code.search(regex) === 0) {
-        [stripped] = code.match(regex) || [];
-        code = code.slice(stripped.length);
-        startIndex = endIndex;
-        endIndex += stripped.length;
-        return stripped;
-      } else {
-        return false;
-      }
-    };
-    let addToken = (type) => {
-      tokens.push(new Token(type, stripped, startIndex, endIndex, line, col));
-    }
-
+    stripped = null;
+    
     if (strip(/ |\t/)) {
       addToken("whitespace");
     }
@@ -54,11 +56,11 @@ let tokenize = function(code, esversion = 5) {
     }
 
     // Numeric literals: binary, octal, legacy octal, hex, decimal
-    else if (es6 && strip(/0b[01]+/)) {
+    else if (es6 && strip(/0b[01]+/i)) {
       addToken("literal");
       expression = true;
     }
-    else if (es6 && strip(/0o[0-7]+/)) {
+    else if (es6 && strip(/0o[0-7]+/i)) {
       addToken("literal");
       expression = true;
     }
@@ -66,21 +68,17 @@ let tokenize = function(code, esversion = 5) {
       addToken("literal");
       expression = true;
     }
-    else if (strip(/0x[0-9A-Fa-f]+/)) {
+    else if (strip(/0x[0-9A-F]+/i)) {
       addToken("literal");
       expression = true;
     }
-    else if (strip(/\d+\.?\d*(?:e[+-]?\d+)?/i)) {
-      addToken("literal");
-      expression = true;
-    }
-    else if (strip(/\.\d+(?:e[+-]?\d+)?/)) {
+    else if (strip(/(?:\d*\.?\d+|\d+\.?)(?:e[+-]?\d+)?/i)) {
       addToken("literal");
       expression = true;
     }
 
     // String literals
-    else if (strip(/(["'])(?:(?!\1)(?:\\[^]|[^\\]))*\1/)) {
+    else if (strip(/(["'])(?:(?!\1)(?:\\[^]|[^\\\r\n]))*\1/)) {
       addToken("literal");
       expression = true;
     }
@@ -114,13 +112,17 @@ let tokenize = function(code, esversion = 5) {
 
     // Taken from http://www.javascripter.net/faq/reserved.htm, but
     // only the ones that cannot be used as variable names in Firefox 54.0a2
-    else if (strip(/(?:break|case|catch|class|const|continue|default|delete|do|else|export|extends|finally|for|function|if|import|in|instanceof|let|new|return|switch|throw|try|typeof|var|void|while|with)(?![\w$])/)) {
+    else if (strip(/(?:break|case|catch|class|const|continue|debugger|default|delete|do|else|enum|export|extends|finally|for|function|if|import|in|instanceof|new|return|super|switch|throw|try|typeof|var|void|while|with)(?![\w$])/)) {
+      addToken("keyword");
+      expression = false;
+    }
+    else if (es6 && strip(/(?:await|let|yield)(?![\w$])/)) {
       addToken("keyword");
       expression = false;
     }
 
-    // Valid identifier names (excluding Unicode)
-    else if (strip(/[A-Za-z_$][\w$]*/)) {
+    // Valid identifier names (excluding higher Unicode)
+    else if (strip(/(?:\\u00(?:[46][1-9A-F]|[57][0-9A]|24|5F)|[A-Z_$])(?:\\u00(?:3\d|[46][1-9A-F]|[57][0-9A]|24|5F)|[\w$])*/i)) {
       addToken("identifier");
       expression = true;
     }
@@ -129,8 +131,11 @@ let tokenize = function(code, esversion = 5) {
     else if (strip(/\/\/.*/)) {
       addToken("comment");
     }
-    else if (strip(/\/\*(?:(?!\*\/).)*\*\//)) {
+    else if (strip(/\/\*(?:(?!\*\/)[^])*\*\//)) {
       addToken("comment");
+    }
+    else if (strip(/\/\*(?:(?!\*\/)[^])*$/)) {
+      throw new SyntaxError("Unterminated comment at index " + startIndex + " (line " + line + ", col " + col + ")");
     }
 
     // Regexes
@@ -191,11 +196,11 @@ let tokenize = function(code, esversion = 5) {
         addToken("right-brace");
         expression = true;
       } else {
-        throw new SyntaxError("Unmatched right-brace at index " + startIndex);
+        throw new SyntaxError("Unmatched right-brace at index " + startIndex + " (line " + line + ", col " + col + ")");
       }
     }
     else {
-      throw new SyntaxError("Couldn't understand this code: " + code);
+      throw new SyntaxError("Couldn't understand this code: " + code.split(/\r|\n/)[0] + " (line " + line + ", col " + col + ")");
     }
     
     line += stripped.split("\n").length - 1;
