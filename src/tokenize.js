@@ -60,6 +60,7 @@ let tokenize = function(code, esversion = 5) {
   
   while (code.length && maxloop--) {
     stripped = null;
+    let location = " (line " + line + ", col " + col + ")";
     
     if (strip(/ |\t/)) {
       addToken("whitespace");
@@ -73,9 +74,15 @@ let tokenize = function(code, esversion = 5) {
       addToken("literal");
       expression = true;
     }
+    else if (es6 && strip(/0b/i)) {
+      throw new SyntaxError("Missing binary digits after " + stripped + location)
+    }
     else if (es6 && strip(/0o[0-7]+/i)) {
       addToken("literal");
       expression = true;
+    }
+    else if (es6 && strip(/0o/i)) {
+      throw new SyntaxError("Missing octal digits after " + stripped + location)
     }
     else if (strip(/0\d+/)) {
       addToken("literal");
@@ -85,7 +92,17 @@ let tokenize = function(code, esversion = 5) {
       addToken("literal");
       expression = true;
     }
-    else if (strip(/(?:\d*\.?\d+|\d+\.?)(?:e[+-]?\d+)?/i)) {
+    else if (strip(/0x/i)) {
+      throw new SyntaxError("Missing hexadecimal digits after " + stripped + location)
+    }
+    else if (strip(/(?:\d*\.\d+|\d+\.?)e[+-]?\d+/i)) {
+      addToken("literal");
+      expression = true;
+    }
+    else if (strip(/(?:\d*\.\d+|\d+\.?)e/i)) {
+      throw new SyntaxError("Missing exponent after " + stripped + location)
+    }
+    else if (strip(/\d*\.\d+|\d+\.?/i)) {
       addToken("literal");
       expression = true;
     }
@@ -96,7 +113,7 @@ let tokenize = function(code, esversion = 5) {
       expression = true;
     }
     else if (strip(/["']/)) {
-      throw new SyntaxError("Unfinished string (line " + line + ", col " + col + ")");
+      throw new SyntaxError("Unfinished string" + location);
     }
 
     // Template literals
@@ -110,7 +127,7 @@ let tokenize = function(code, esversion = 5) {
       expression = false;
     }
     else if (es6 && strip(/`/)) {
-      throw new SyntaxError("Unfinished template literal (line " + line + ", col " + col + ")");
+      throw new SyntaxError("Unfinished template literal" + location);
     }
     else if (es6 && braces[0] === 0 && braces.length > 1 && strip(/\}(?:\\[^]|(?!\$\{)[^\\`])*`/)) {
       addToken("template-end");
@@ -122,7 +139,7 @@ let tokenize = function(code, esversion = 5) {
       expression = false;
     }
     else if (es6 && braces[0] === 0 && braces.length > 1 && strip(/\}/)) {
-      throw new SyntaxError("Unfinished template literal section (line " + line + ", col " + col + ")");
+      throw new SyntaxError("Unfinished template literal section" + location);
     }
 
     // Values that throw an error when you try to assign something to
@@ -162,14 +179,23 @@ let tokenize = function(code, esversion = 5) {
     else if (strip(/\/\*(?:(?!\*\/)[^])*\*\//)) {
       addToken("comment");
     }
-    else if (strip(/\/\*(?:(?!\*\/)[^])*$/)) {
-      throw new SyntaxError("Unterminated comment at index " + startIndex + " (line " + line + ", col " + col + ")");
+    else if (strip(/\/\*/)) {
+      throw new SyntaxError("Unfinished comment" + location);
+    }
+    else if (es6 && newLine && strip(/-->.*/)) {
+      addToken("comment");
+    }
+    else if (es6 && strip(/<!--.*/)) {
+      addToken("comment");
     }
 
     // Regexes
     else if (!expression && strip(/\/(?:\\.|\[(?:\\.|[^\]\n\r])+\]|[^\\\/\n\r])+\/[A-Za-z]*/)) {
       addToken("literal");
       expression = true;
+    }
+    else if (!expression && strip(/\//)) {
+      throw new SyntaxError("Unfinished regular expression" + location);
     }
     
     // ES6 Operators
@@ -228,11 +254,11 @@ let tokenize = function(code, esversion = 5) {
         addToken("right-brace");
         expression = true;
       } else {
-        throw new SyntaxError("Unmatched right-brace at index " + startIndex + " (line " + line + ", col " + col + ")");
+        throw new SyntaxError("Unmatched right-brace" + location);
       }
     }
     else {
-      throw new SyntaxError("Couldn't understand this code: " + code.split(/\r|\n/)[0] + " (line " + line + ", col " + col + ")");
+      throw new SyntaxError("Couldn't understand this code: " + code.split(/\r?\n|\r/)[0] + location);
     }
     
     line += stripped.split(/\r?\n|\r/).length - 1;
