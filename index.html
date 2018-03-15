@@ -58,19 +58,41 @@
         
         <script>
             function $(){return document.getElementById.apply(document,arguments);}
+            function writeHighlighted(code, hls) {
+                hls.sort((a, b) => (b.line - a.line) || (b.col - a.col));
+                code = code.split("\n");
+                for (let {type, line, col} of hls) {
+                    let lineText = code[line - 1];
+                    if (typeof lineText === "string")
+                        code[line - 1] = lineText.slice(0, col - 1)
+                                       + (type === "end" ? "</hl>" : "<hl class='" + type + "'>")
+                                       + lineText.slice(col - 1);
+                }
+                $("overlay").innerHTML = code.join("\n");
+            }
             function run() {
-              let tokens, code = $("code").value, version = $("version").value, tokenOutput = $("tokens");
-              try {
-                tokens = tokenize(code, version);
-              } catch (e) {
-                tokenOutput.textContent = e;
-                throw e;
-              }
+                let tokens, code = $("code").value, version = $("version").value, tokenOutput = $("tokens");
+                let highlights = [];
+                try {
+                    tokens = tokenize(code, version);
+                } catch (e) {
+                    tokenOutput.textContent = e;
+                    let [, line, col] = e.message.match(/\(line (\d+), col (\d+)\)$/) || [];
+                    if (line) {
+                        highlights.push(
+                            { type: "red", line: +line, col: +col },
+                            { type: "end", line: +line, col: +1/0 }
+                        );
+                        writeHighlighted(code, highlights);
+                    }
+                    throw e;
+                }
               
-              tokenOutput.textContent = "Tokens:\n" + tokens.map(t => "{\n" +
-                ["type", "value", "start", "end", "line", "col"].map(n => "  " + n + ": " + JSON.stringify(t[n])).join(",\n")
-                + "\n}"
-              ).join(",\n");
+                tokenOutput.textContent = "Tokens:\n" + tokens.map(t => "{\n" +
+                    ["type", "value", "start", "end", "line", "col"].map(n => "  " + n + ": " + JSON.stringify(t[n])).join(",\n")
+                    + "\n}"
+                ).join(",\n");
+                writeHighlighted(code, highlights);
             }
         </script>
         <script src="src/tokenize.js"></script>

@@ -66,7 +66,6 @@ let tokenize = function(code, esversion = 5) {
     }
     else if (strip(/\r?\n|\r/)) {
       addToken("line-end");
-      line++;
     }
 
     // Numeric literals: binary, octal, legacy octal, hex, decimal
@@ -144,6 +143,7 @@ let tokenize = function(code, esversion = 5) {
       addToken("keyword");
       expression = false;
     }
+    // Taken from http://www.ecma-international.org/ecma-262/8.0/#sec-reserved-words
     else if (esversion >= 2017 && lastTrueToken.type !== "period" && strip(/(?:async)(?![\w$])/)) {
       addToken("keyword");
       expression = false;
@@ -235,7 +235,7 @@ let tokenize = function(code, esversion = 5) {
       throw new SyntaxError("Couldn't understand this code: " + code.split(/\r|\n/)[0] + " (line " + line + ", col " + col + ")");
     }
     
-    line += stripped.split("\n").length - 1;
+    line += stripped.split(/\r?\n|\r/).length - 1;
     if (stripped.indexOf("\n") > -1) col = stripped.length - stripped.lastIndexOf("\n");
     else col += stripped.length;
   }
