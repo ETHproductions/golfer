@@ -57,54 +57,76 @@ let tokenize = function(code, esversion = 5) {
       newLine = false;
     }
   }
+  let getFilename = () => "input:" + startIndex + "-" + endIndex;
   
   while (code.length && maxloop--) {
     stripped = null;
     let location = " (line " + line + ", col " + col + ")";
     
-    if (strip(/ |\t/)) {
+    // Everything here can be derived from ECMA-262 clause 11:
+    // https://tc39.github.io/ecma262/#sec-ecmascript-language-lexical-grammar
+    
+    // https://tc39.github.io/ecma262/#sec-white-space
+    if (strip(/[ \t\v\f]/)) {
       addToken("whitespace");
     }
+    // https://tc39.github.io/ecma262/#sec-line-terminators
     else if (strip(/\r?\n|\r/)) {
       addToken("line-end");
     }
 
     // Numeric literals: binary, octal, legacy octal, hex, decimal
-    else if (es6 && strip(/0b[01]+/i)) {
+    else if (es6 && strip(/0b[01]+(?![\w$])/i)) {
       addToken("literal");
       expression = true;
+    }
+    else if (es6 && strip(/0o[0-7]+(?![\w$])/i)) {
+      addToken("literal");
+      expression = true;
+    }
+    else if (strip(/0\d+(?![\w$])/i)) {
+      addToken("literal");
+      expression = true;
+    }
+    else if (strip(/0x[0-9A-F]+(?![\w$])/i)) {
+      addToken("literal");
+      expression = true;
+    }
+    else if ((es6 && strip(/(?:0b[01]+|0o[0-7]+)(?=[A-Z_$])/i)) || strip(/(0\d+|0x[0-9A-F]+)(?=[A-Z_$])/i)) {
+      strip(/./);
+      throw new SyntaxError("Identifier starts immediately after numeric literal" + location, getFilename());
+    }
+    else if ((es6 && strip(/(?:0b[01]+|0o[0-7]+)(?=\d)/i)) || strip(/(0\d+|0x[0-9A-F]+)(?=\d)/i)) {
+      strip(/./);
+      throw new SyntaxError("Numeric literal starts immediately after numeric literal" + location, getFilename());
     }
     else if (es6 && strip(/0b/i)) {
-      throw new SyntaxError("Missing binary digits after " + stripped + location)
-    }
-    else if (es6 && strip(/0o[0-7]+/i)) {
-      addToken("literal");
-      expression = true;
+      throw new SyntaxError("Missing binary digits after " + stripped + location, getFilename());
     }
     else if (es6 && strip(/0o/i)) {
-      throw new SyntaxError("Missing octal digits after " + stripped + location)
-    }
-    else if (strip(/0\d+/)) {
-      addToken("literal");
-      expression = true;
-    }
-    else if (strip(/0x[0-9A-F]+/i)) {
-      addToken("literal");
-      expression = true;
+      throw new SyntaxError("Missing octal digits after " + stripped + location, getFilename());
     }
     else if (strip(/0x/i)) {
-      throw new SyntaxError("Missing hexadecimal digits after " + stripped + location)
+      throw new SyntaxError("Missing hexadecimal digits after " + stripped + location, getFilename());
+    }
+    else if (strip(/(?:\d*\.\d+|\d+\.?)e[+-]?\d+(?![\w$])/i)) {
+      addToken("literal");
+      expression = true;
     }
     else if (strip(/(?:\d*\.\d+|\d+\.?)e[+-]?\d+/i)) {
-      addToken("literal");
-      expression = true;
+      strip(/./);
+      throw new SyntaxError("Identifier starts immediately after numeric literal" + location, getFilename());
     }
     else if (strip(/(?:\d*\.\d+|\d+\.?)e/i)) {
-      throw new SyntaxError("Missing exponent after " + stripped + location)
+      throw new SyntaxError("Missing exponent in scientific literal" + location, getFilename());
     }
-    else if (strip(/\d*\.\d+|\d+\.?/i)) {
+    else if (strip(/(?:\d*\.\d+|\d+\.?)(?![\w$])/i)) {
       addToken("literal");
       expression = true;
+    }
+    else if (strip(/(?:\d*\.\d+|\d+\.?)(?=[\w$])/i)) {
+      strip(/./);
+      throw new SyntaxError("Identifier starts immediately after numeric literal" + location, getFilename());
     }
 
     // String literals
@@ -112,8 +134,8 @@ let tokenize = function(code, esversion = 5) {
       addToken("literal");
       expression = true;
     }
-    else if (strip(/["']/)) {
-      throw new SyntaxError("Unfinished string" + location);
+    else if (strip(/["'].*/)) {
+      throw new SyntaxError("Unfinished string" + location, getFilename());
     }
 
     // Template literals
@@ -126,8 +148,8 @@ let tokenize = function(code, esversion = 5) {
       braces.unshift(0);
       expression = false;
     }
-    else if (es6 && strip(/`/)) {
-      throw new SyntaxError("Unfinished template literal" + location);
+    else if (es6 && strip(/`.*/)) {
+      throw new SyntaxError("Unfinished template literal" + location, getFilename());
     }
     else if (es6 && braces[0] === 0 && braces.length > 1 && strip(/\}(?:\\[^]|(?!\$\{)[^\\`])*`/)) {
       addToken("template-end");
@@ -138,8 +160,8 @@ let tokenize = function(code, esversion = 5) {
       addToken("template-middle");
       expression = false;
     }
-    else if (es6 && braces[0] === 0 && braces.length > 1 && strip(/\}/)) {
-      throw new SyntaxError("Unfinished template literal section" + location);
+    else if (es6 && braces[0] === 0 && braces.length > 1 && strip(/\}.*/)) {
+      throw new SyntaxError("Unfinished template literal section" + location, getFilename());
     }
 
     // Values that throw an error when you try to assign something to
@@ -160,13 +182,8 @@ let tokenize = function(code, esversion = 5) {
       addToken("keyword");
       expression = false;
     }
-    // Taken from http://www.ecma-international.org/ecma-262/8.0/#sec-reserved-words
-    else if (esversion >= 2017 && lastTrueToken.type !== "period" && strip(/(?:async)(?![\w$])/)) {
-      addToken("keyword");
-      expression = false;
-    }
 
-    // Valid identifier names (excluding higher Unicode)
+    // Valid identifier names (excluding higher Unicode and \u{XXXXXX} escapes)
     else if (strip(/(?:\\u00(?:[46][1-9A-F]|[57][0-9A]|24|5F)|[A-Z_$])(?:\\u00(?:3\d|[46][1-9A-F]|[57][0-9A]|24|5F)|[\w$])*/i)) {
       addToken("identifier");
       expression = true;
@@ -179,8 +196,8 @@ let tokenize = function(code, esversion = 5) {
     else if (strip(/\/\*(?:(?!\*\/)[^])*\*\//)) {
       addToken("comment");
     }
-    else if (strip(/\/\*/)) {
-      throw new SyntaxError("Unfinished comment" + location);
+    else if (strip(/\/\*.*/)) {
+      throw new SyntaxError("Unfinished comment" + location, getFilename());
     }
     else if (es6 && newLine && strip(/-->.*/)) {
       addToken("comment");
@@ -190,12 +207,12 @@ let tokenize = function(code, esversion = 5) {
     }
 
     // Regexes
-    else if (!expression && strip(/\/(?:\\.|\[(?:\\.|[^\]\n\r])+\]|[^\\\/\n\r])+\/[A-Za-z]*/)) {
+    else if (!expression && strip(/\/(?:\\.|\[(?:\\.|[^\]\n\r])*\]|[^\\\/\n\r])+\/[A-Za-z]*/)) {
       addToken("literal");
       expression = true;
     }
-    else if (!expression && strip(/\//)) {
-      throw new SyntaxError("Unfinished regular expression" + location);
+    else if (!expression && strip(/\/.*/)) {
+      throw new SyntaxError("Unfinished regular expression" + location, getFilename());
     }
     
     // ES6 Operators
@@ -254,7 +271,7 @@ let tokenize = function(code, esversion = 5) {
         addToken("right-brace");
         expression = true;
       } else {
-        throw new SyntaxError("Unmatched right-brace" + location);
+        throw new SyntaxError("Unmatched right-brace" + location, getFilename());
       }
     }
     else {

@@ -59,16 +59,24 @@
         <script>
             function $(){return document.getElementById.apply(document,arguments);}
             function writeHighlighted(code, hls) {
-                hls.sort((a, b) => (b.line - a.line) || (b.col - a.col));
-                code = code.split("\n");
-                for (let {type, line, col} of hls) {
-                    let lineText = code[line - 1];
-                    if (typeof lineText === "string")
-                        code[line - 1] = lineText.slice(0, col - 1)
-                                       + (type === "end" ? "</hl>" : "<hl class='" + type + "'>")
-                                       + lineText.slice(col - 1);
+                hls.sort((a, b) => (b.index - a.index) || (b.line - a.line) || (b.col - a.col));
+                for (let {type, line, col, index} of hls) {
+                    if (!isNaN(index)) {
+                        code = code.slice(0, index)
+                             + (type === "end" ? "</hl>" : "<hl class='" + type + "'>")
+                             + code.slice(index);
+                    }
+                    else {
+                        code = code.split("\n");
+                        let lineText = code[line - 1];
+                        if (typeof lineText === "string")
+                            code[line - 1] = lineText.slice(0, col - 1)
+                                           + (type === "end" ? "</hl>" : "<hl class='" + type + "'>")
+                                           + lineText.slice(col - 1);
+                        code = code.join("\n");
+                    }
                 }
-                $("overlay").innerHTML = code.join("\n");
+                $("overlay").innerHTML = code;
             }
             function run() {
                 let tokens, code = $("code").value, version = $("version").value, tokenOutput = $("tokens");
@@ -78,10 +86,11 @@
                 } catch (e) {
                     tokenOutput.textContent = e;
                     let [, line, col] = e.message.match(/\(line (\d+), col (\d+)\)$/) || [];
+                    let [, startIndex, endIndex] = e.fileName.match(/input:(\d+)-(\d+)/) || [];
                     if (line) {
                         highlights.push(
-                            { type: "red", line: +line, col: +col },
-                            { type: "end", line: +line, col: +1/0 }
+                            { type: "red", line: +line, col: +col, index: +startIndex },
+                            { type: "end", line: +line, col: +1/0, index: +endIndex }
                         );
                         writeHighlighted(code, highlights);
                     }
